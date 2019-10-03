@@ -52,6 +52,8 @@ import {
     OP_THREAD,
     OP_XOR,
     OP_XORI,
+    OP_JMP_E,
+    OP_JMPI_E,
 } from "../opcodes";
 import Logger from "js-logger";
 
@@ -83,6 +85,20 @@ const numeric_ops: Record<
     xor: (a, b) => a ^ b,
     shl: (a, b) => a << b,
     shr: (a, b) => a >>> b,
+};
+
+type ComparisonOperation = (a: number, b: number) => boolean;
+
+const comparison_ops: Record<
+    "eq" | "neq" | "gt" | "lt" | "gte" | "lte",
+    ComparisonOperation
+> = {
+    eq: (a, b) => a === b,
+    neq: (a, b) => a !== b,
+    gt: (a, b) => a > b,
+    lt: (a, b) => a < b,
+    gte: (a, b) => a >= b,
+    lte: (a, b) => a <= b,
 };
 
 export class VirtualMachine {
@@ -148,6 +164,11 @@ export class VirtualMachine {
         const inst = this.get_next_instruction_from_thread(exec);
 
         const [arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7] = inst.args.map(arg => arg.value);
+
+        // helper for conditional jump opcodes
+        const conditional_jump_args:
+            (cond: ComparisonOperation) => [Thread, number, number, number, ComparisonOperation]
+            = (cond) => [exec, arg2, arg0, arg1, cond];
 
         switch (inst.opcode.code) {
             case OP_NOP.code:
@@ -269,6 +290,13 @@ export class VirtualMachine {
             case OP_SHIFT_RIGHT.code:
                 this.do_numeric_op_with_register(arg0, arg1, numeric_ops.shr);
                 break;
+            // conditional jumps
+            case OP_JMP_E.code:
+                this.signed_conditional_jump_with_register.apply(null, conditional_jump_args(comparison_ops.eq));
+                break;
+            case OP_JMPI_E.code:
+                this.signed_conditional_jump_with_literal.apply(null, conditional_jump_args(comparison_ops.eq));
+                break;
             default:
                 throw new Error(`Unsupported instruction: ${inst.opcode.mnemonic}.`);
         }
@@ -318,6 +346,10 @@ export class VirtualMachine {
 
     private set_sint(reg: number, value: number): void {
         this.registers.setInt32(REGISTER_SIZE * reg, value);
+    }
+
+    private get_uint(reg: number): number {
+        return this.registers.getUint32(REGISTER_SIZE * reg);
     }
 
     private set_uint(reg: number, value: number): void {
@@ -387,6 +419,58 @@ export class VirtualMachine {
         } else {
             top.seg_idx = seg_idx;
             top.inst_idx = -1;
+        }
+    }
+
+    private signed_conditional_jump_with_register(
+        exec: Thread,
+        label: number,
+        reg1: number,
+        reg2: number,
+        condition: ComparisonOperation
+    ): void {
+        this.conditional_jump(exec, label, this.get_sint(reg1), this.get_sint(reg2), condition);
+    }
+
+    private signed_conditional_jump_with_literal(
+        exec: Thread,
+        label: number,
+        reg: number,
+        literal: number,
+        condition: ComparisonOperation
+    ): void {
+        this.conditional_jump(exec, label, this.get_sint(reg), literal, condition);
+    }
+
+    private unsigned_conditional_jump_with_register(
+        exec: Thread,
+        label: number,
+        reg1: number,
+        reg2: number,
+        condition: ComparisonOperation
+    ): void {
+        this.conditional_jump(exec, label, this.get_uint(reg1), this.get_uint(reg2), condition);
+    }
+
+    private unsigned_conditional_jump_with_literal(
+        exec: Thread,
+        label: number,
+        reg: number,
+        literal: number,
+        condition: ComparisonOperation
+    ): void {
+        this.conditional_jump(exec, label, this.get_uint(reg), literal, condition);
+    }
+
+    private conditional_jump(
+        exec: Thread,
+        label: number,
+        val1: number,
+        val2: number,
+        condition: ComparisonOperation
+    ): void {
+        if (condition(val1, val2)) {
+            this.jump_to_label(exec, label);
         }
     }
 
