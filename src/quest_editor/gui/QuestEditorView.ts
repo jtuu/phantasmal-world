@@ -16,6 +16,7 @@ import { NpcListView } from "./NpcListView";
 import { ObjectListView } from "./ObjectListView";
 import { EventsView } from "./EventsView";
 import Logger = require("js-logger");
+import { QuestMessageLogView } from "./MessageLogView";
 
 const logger = Logger.get("quest_editor/gui/QuestEditorView");
 
@@ -28,6 +29,7 @@ const VIEW_TO_NAME = new Map<new () => ResizableWidget, string>([
     [EntityInfoView, "entity_info"],
     [NpcListView, "npc_list_view"],
     [ObjectListView, "object_list_view"],
+    [QuestMessageLogView, "message_log_view"],
 ]);
 
 if (gui_store.feature_active("events")) {
@@ -37,7 +39,8 @@ if (gui_store.feature_active("events")) {
 const DEFAULT_LAYOUT_CONFIG = {
     settings: {
         showPopoutIcon: false,
-        showMaximiseIcon: false,
+        showMaximiseIcon: true,
+        showCloseIcon: true,
     },
     dimensions: {
         headerHeight: 24,
@@ -84,20 +87,43 @@ const DEFAULT_LAYOUT_CONTENT: ItemConfigType[] = [
                 ],
             },
             {
-                type: "stack",
+                type: "column",
                 width: 9,
                 content: [
                     {
-                        title: "3D View",
-                        type: "component",
-                        componentName: VIEW_TO_NAME.get(QuestRendererView),
+                        type: "stack",
+                        width: 9,
+                        height: 8,
                         isClosable: false,
+                        content: [
+                            {
+                                title: "3D View",
+                                type: "component",
+                                componentName: VIEW_TO_NAME.get(QuestRendererView),
+                                isClosable: false,
+                            },
+                            {
+                                title: "Script",
+                                type: "component",
+                                componentName: VIEW_TO_NAME.get(AsmEditorView),
+                                isClosable: false,
+                            },
+                        ],
                     },
                     {
-                        title: "Script",
-                        type: "component",
-                        componentName: VIEW_TO_NAME.get(AsmEditorView),
-                        isClosable: false,
+                        type: "stack",
+                        width: 9,
+                        height: 2,
+                        // note: children must also all be closable for this to work
+                        isClosable: true,
+                        content: [
+                            {
+                                title: "Log",
+                                type: "component",
+                                componentName: VIEW_TO_NAME.get(QuestMessageLogView),
+                                isClosable: true,
+                            },
+                        ],
                     },
                 ],
             },

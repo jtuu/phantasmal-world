@@ -1,0 +1,26 @@
+.MessageLogView {
+    overflow: auto;
+}
+
+.MessageLogView_message_list {
+    font-family: monospace;
+    cursor: auto;
+    user-select: all;
+    margin-left: 0.5em;
+    margin-right: 0.5em;
+    margin-top: 0.2em;
+    margin-bottom: 0.2em;
+}
+
+.MessageLogView_message_container {
+    display: flex;
+}
+
+.MessageLogView_timestamp {
+    margin-right: 1em;
+    color: var(--text-color-disabled);
+}
+
+.MessageLogView_message {
+    overflow-wrap: anywhere;
+}
