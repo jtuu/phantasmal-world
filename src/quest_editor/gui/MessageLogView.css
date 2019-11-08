@@ -1,26 +1,38 @@
 .MessageLogView {
+    display: flex;
+    flex-direction: column;
+}
+
+.MessageLogView_settings {
+    justify-content: end;
+}
+
+.MessageLogView_list_container {
     overflow: auto;
 }
 
 .MessageLogView_message_list {
     font-family: monospace;
     cursor: auto;
-    user-select: all;
+    user-select: text;
     margin-left: 0.5em;
     margin-right: 0.5em;
     margin-top: 0.2em;
     margin-bottom: 0.2em;
 }
 
-.MessageLogView_message_container {
+.MessageLogView_message {
     display: flex;
 }
 
-.MessageLogView_timestamp {
-    margin-right: 1em;
+.MessageLogView_message > * + * {
+    margin-left: 1ch;
+}
+
+.MessageLogView_message > .MessageLogView_message_timestamp {
     color: var(--text-color-disabled);
 }
 
-.MessageLogView_message {
+.MessageLogView_message > .MessageLogView_message_contents {
     overflow-wrap: anywhere;
 }
