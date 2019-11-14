@@ -47,3 +47,15 @@ export function defined<T>(value: T | undefined): asserts value is T {
         throw new Error("Assertion Error: value is undefined.");
     }
 }
+
+export function assert(condition: any, msg?: string): asserts condition {
+    if (!condition) {
+        let full_msg = "Assertion Error";
+        
+        if (msg) {
+            full_msg += ": " + msg;
+        }
+
+        throw new Error(full_msg);
+    }
+}
