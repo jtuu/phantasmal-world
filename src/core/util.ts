@@ -41,3 +41,9 @@ export function basename(filename: string): string {
 
     return filename;
 }
+
+export function defined<T>(value: T | undefined): asserts value is T {
+    if (value === undefined) {
+        throw new Error("Assertion Error: value is undefined.");
+    }
+}
