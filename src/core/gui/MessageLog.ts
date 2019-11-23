@@ -59,9 +59,11 @@ export class MessageLog extends ResizableWidget {
         this.list_container = el.div({ class: this.base_classname + "_list_container" });
         this.list_element = el.div({ class: this.base_classname + "_message_list" });
 
-        this.level_filter = new DropDown("Level", this.store.log_levels, l => l.name, {
-            class: this.base_classname + "_level_filter",
-        });
+        this.level_filter = this.disposable(
+            new DropDown("Level", this.store.log_levels, l => l.name, {
+                class: this.base_classname + "_level_filter",
+            }),
+        );
 
         const show_all: LogGroup = {
             name: "Show All",
@@ -71,14 +73,18 @@ export class MessageLog extends ResizableWidget {
         // prepend fake "show all" option at the start
         const group_list = list_property(undefined, show_all, ...this.store.log_groups.val);
 
-        this.group_filter = new DropDown("Group", group_list, g => g.name, {
-            class: this.base_classname + "_group_filter",
-        });
+        this.group_filter = this.disposable(
+            new DropDown("Group", group_list, g => g.name, {
+                class: this.base_classname + "_group_filter",
+            }),
+        );
 
-        this.settings_bar = new ToolBar({
-            class: this.base_classname + "_settings",
-            children: [this.level_filter, this.group_filter],
-        });
+        this.settings_bar = this.disposable(
+            new ToolBar({
+                class: this.base_classname + "_settings",
+                children: [this.level_filter, this.group_filter],
+            }),
+        );
 
         this.disposables(
             // before update, save scroll state
