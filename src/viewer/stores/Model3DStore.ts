@@ -1,7 +1,13 @@
 import { ArrayBufferCursor } from "../../core/data_formats/cursor/ArrayBufferCursor";
 import { Endianness } from "../../core/data_formats/Endianness";
 import { NjMotion, parse_njm } from "../../core/data_formats/parsing/ninja/motion";
-import { NjObject, parse_nj, parse_xj } from "../../core/data_formats/parsing/ninja";
+import {
+    NjObject,
+    parse_nj,
+    parse_xj,
+    write_nj,
+    is_njcm_model,
+} from "../../core/data_formats/parsing/ninja";
 import { CharacterClassModel } from "../model/CharacterClassModel";
 import { CharacterClassAnimationModel } from "../model/CharacterClassAnimationModel";
 import { WritableProperty } from "../../core/observable/property/WritableProperty";
@@ -16,6 +22,9 @@ import {
     get_character_class_data,
 } from "../loading/character_class";
 import Logger = require("js-logger");
+import { ResizableBufferCursor } from "../../core/data_formats/cursor/ResizableBufferCursor";
+import { NjcmModel } from "../../core/data_formats/parsing/ninja/njcm";
+import { ResizableBuffer } from "../../core/data_formats/ResizableBuffer";
 
 const logger = Logger.get("viewer/stores/ModelStore");
 const nj_object_cache: Map<string, Promise<NjObject>> = new Map();
@@ -128,7 +137,7 @@ export class Model3DStore implements Disposable {
             if (file.name.endsWith(".nj")) {
                 this.clear_current_model();
 
-                const nj_object = parse_nj(cursor)[0];
+                const nj_object = parse_nj(cursor)[0].children[0].children[0].children[5].children[0].children[3].children[0];
 
                 this.set_current_nj_data({
                     nj_object,
@@ -165,6 +174,43 @@ export class Model3DStore implements Disposable {
         } catch (e) {
             logger.error("Couldn't read file.", e);
         }
+    };
+
+    save_as = (): void => {
+        const data = this.current_nj_data.val;
+        if (!data) return;
+
+        let default_file_name = "model";
+
+        if (default_file_name) {
+            const ext_start = default_file_name.lastIndexOf(".");
+            if (ext_start !== -1) default_file_name = default_file_name.slice(0, ext_start);
+        }
+
+        let file_name = prompt("File name:", default_file_name);
+        if (!file_name) return;
+
+        const buffer = new ResizableBufferCursor(new ResizableBuffer(4), Endianness.Little);
+        if (data.nj_object.model && is_njcm_model(data.nj_object.model)) {
+            write_nj(buffer, [data.nj_object as NjObject<NjcmModel>]);
+        } else {
+            return;
+        }
+
+        if (!file_name.endsWith(".nj")) {
+            file_name += ".nj";
+        }
+
+        buffer.seek_start(0);
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(
+            new Blob([buffer.array_buffer()], { type: "application/octet-stream" }),
+        );
+        a.download = file_name;
+        document.body.appendChild(a);
+        a.click();
+        URL.revokeObjectURL(a.href);
+        document.body.removeChild(a);
     };
 
     private load_model = async (model?: CharacterClassModel): Promise<void> => {

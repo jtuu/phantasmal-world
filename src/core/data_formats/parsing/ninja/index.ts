@@ -1,10 +1,14 @@
 import { Cursor } from "../../cursor/Cursor";
 import { Vec3 } from "../../vector";
 import { parse_iff } from "../iff";
-import { NjcmModel, parse_njcm_model } from "./njcm";
+import { NjcmModel, parse_njcm_model, write_njcm_model } from "./njcm";
 import { parse_xj_model, XjModel } from "./xj";
+import { WritableCursor } from "../../cursor/WritableCursor";
+import { ResizableBufferCursor } from "../../cursor/ResizableBufferCursor";
+import { ResizableBuffer } from "../../ResizableBuffer";
 
 export const ANGLE_TO_RAD = (2 * Math.PI) / 0xffff;
+export const RAD_TO_ANGLE = 0xffff / (2 * Math.PI);
 
 const NJCM = 0x4d434a4e;
 
@@ -108,6 +112,10 @@ export function parse_nj(cursor: Cursor): NjObject<NjcmModel>[] {
     return parse_ninja(cursor, parse_njcm_model, []);
 }
 
+export function write_nj(dst: ResizableBufferCursor, objects: NjObject<NjcmModel>[]): void {
+    write_ninja(dst, objects, write_njcm_model, []);
+}
+
 /**
  * Parses an NJCM file.
  */
@@ -136,6 +144,30 @@ function parse_ninja<M extends NjModel>(
     }
 
     return objects;
+}
+
+function write_ninja<M extends NjModel>(
+    dst: ResizableBufferCursor,
+    objects: NjObject<M>[],
+    parse_model: (dst: WritableCursor, model: M, context: any) => void,
+    context: any,
+): void {
+    for (const obj of objects) {
+        dst.write_u32(NJCM);
+
+        const size_pos = dst.position;
+        dst.write_u32(0);
+
+        const chunk = new ResizableBufferCursor(new ResizableBuffer(0), dst.endianness);
+        write_sibling_objects(chunk, obj, parse_model, context);
+
+        const chunk_size = chunk.position;
+        for (let i = 0; i < chunk_size; i++) {
+            dst.write_u8(chunk.u8_at(i));
+        }
+
+        dst.write_u32_at(size_pos, chunk_size);
+    }
 }
 
 // TODO: cache model and object offsets so we don't reparse the same data.
@@ -207,4 +239,58 @@ function parse_sibling_objects<M extends NjModel>(
     );
 
     return [object, ...siblings];
+}
+
+function write_sibling_objects<M extends NjModel>(
+    dst: WritableCursor,
+    object: NjObject<M>,
+    write_model: (dst: WritableCursor, model: M, context: any) => void,
+    context: any,
+): void {
+    let eval_flags = 0;
+    {
+        const flags = object.evaluation_flags;
+        eval_flags ^= (-flags.no_translate ^ eval_flags) & (1 << 0);
+        eval_flags ^= (-flags.no_rotate ^ eval_flags) & (1 << 1);
+        eval_flags ^= (-flags.no_scale ^ eval_flags) & (1 << 2);
+        eval_flags ^= (-flags.hidden ^ eval_flags) & (1 << 3);
+        eval_flags ^= (-flags.break_child_trace ^ eval_flags) & (1 << 4);
+        eval_flags ^= (-flags.zxy_rotation_order ^ eval_flags) & (1 << 5);
+        eval_flags ^= (-flags.skip ^ eval_flags) & (1 << 6);
+        eval_flags ^= (-flags.shape_skip ^ eval_flags) & (1 << 7);
+    }
+    dst.write_u32(eval_flags);
+
+    const model_offset_pos = dst.position;
+    dst.write_u32(0);
+
+    dst.write_vec3_f32(object.position);
+
+    dst.write_i32(object.rotation.x * RAD_TO_ANGLE);
+    dst.write_i32(object.rotation.y * RAD_TO_ANGLE);
+    dst.write_i32(object.rotation.z * RAD_TO_ANGLE);
+
+    dst.write_vec3_f32(object.scale);
+
+    const child_offset = dst.position;
+    dst.write_u32(0);
+
+    // sibling offset
+    dst.write_u32(0);
+
+    if (object.model) {
+        dst.write_u32_at(model_offset_pos, dst.position);
+        write_model(dst, object.model, context);
+    }
+
+    if (object.children.length > 0) {
+        dst.write_u32_at(child_offset, dst.position);
+        for (const child of object.children) {
+            write_sibling_objects(dst, child, write_model, context);
+        }
+    }
+
+    // FIXME:
+    // i don't know how to handle siblings.
+    // aren't they also children of the same parent?
 }

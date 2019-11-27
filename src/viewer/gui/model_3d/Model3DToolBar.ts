@@ -6,12 +6,17 @@ import { PSO_FRAME_RATE } from "../../../core/rendering/conversion/ninja_animati
 import { model_store } from "../../stores/Model3DStore";
 import { Label } from "../../../core/gui/Label";
 import { Icon } from "../../../core/gui/dom";
+import { Button } from "../../../core/gui/Button";
 
 export class Model3DToolBar extends ToolBar {
     constructor() {
         const open_file_button = new FileButton("Open file...", {
             icon_left: Icon.File,
             accept: ".nj, .njm, .xj, .xvm",
+        });
+        const save_as_button = new Button("Save as...", {
+            icon_left: Icon.Save,
+            tooltip: "Save this model to new file",
         });
         const skeleton_checkbox = new CheckBox(false, { label: "Show skeleton" });
         const play_animation_checkbox = new CheckBox(true, { label: "Play animation" });
@@ -34,6 +39,7 @@ export class Model3DToolBar extends ToolBar {
         super({
             children: [
                 open_file_button,
+                save_as_button,
                 skeleton_checkbox,
                 play_animation_checkbox,
                 animation_frame_rate_input,
@@ -47,6 +53,8 @@ export class Model3DToolBar extends ToolBar {
             open_file_button.files.observe(({ value: files }) => {
                 if (files.length) model_store.load_file(files[0]);
             }),
+
+            save_as_button.click.observe(model_store.save_as),
 
             skeleton_checkbox.checked.observe(({ value }) => model_store.set_show_skeleton(value)),
         );
