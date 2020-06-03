@@ -3,6 +3,9 @@ import { parse_iff, parse_iff_headers } from "../iff";
 import { LogManager } from "../../../Logger";
 import { Result, result_builder } from "../../../Result";
 import { Severity } from "../../../Severity";
+import { ArrayBufferCursor } from "../../cursor/ArrayBufferCursor";
+import { Endianness } from "../../Endianness";
+import { WritableCursor } from "../../cursor/WritableCursor";
 
 const logger = LogManager.get("core/data_formats/parsing/ninja/texture");
 
@@ -98,4 +101,20 @@ function parse_header(cursor: Cursor): Header {
     return {
         texture_count,
     };
+}
+
+export function write_xvr(xvr: XvrTexture, dst?: WritableCursor): Cursor {
+    const header_size = 56;
+    if (dst === undefined) {
+        dst = new ArrayBufferCursor(new ArrayBuffer(xvr.size + header_size), Endianness.Little);
+    }
+    dst.write_u32(xvr.format[0]);
+    dst.write_u32(xvr.format[1]);
+    dst.write_u32(xvr.id);
+    dst.write_u16(xvr.width);
+    dst.write_u16(xvr.height);
+    dst.write_u32(xvr.size);
+    dst.seek(36);
+    dst.write_u32_array(Array.from(new Uint32Array(xvr.data)));
+    return dst;
 }

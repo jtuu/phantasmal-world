@@ -1,7 +1,13 @@
 import { Controller } from "../../../core/controllers/Controller";
 import { filename_extension } from "../../../core/util";
 import { read_file } from "../../../core/files";
-import { is_xvm, parse_xvm, XvrTexture } from "../../../core/data_formats/parsing/ninja/texture";
+import {
+    is_xvm,
+    parse_xvm,
+    XvrTexture,
+    parse_xvr,
+    write_xvr,
+} from "../../../core/data_formats/parsing/ninja/texture";
 import { ArrayBufferCursor } from "../../../core/data_formats/cursor/ArrayBufferCursor";
 import { Endianness } from "../../../core/data_formats/Endianness";
 import { parse_afs } from "../../../core/data_formats/parsing/afs";
@@ -14,6 +20,9 @@ import { failure, Result, result_builder } from "../../../core/Result";
 import { Severity } from "../../../core/Severity";
 import { Property } from "../../../core/observable/property/Property";
 import { WritableProperty } from "../../../core/observable/property/WritableProperty";
+import { rgba8_to_xvr_texture, adjust_image_dimensions_for_xvr } from "../../../core/rendering/conversion/ninja_textures";
+import { prs_compress } from "../../../core/data_formats/compression/prs/compress";
+import { write_iff } from "../../../core/data_formats/parsing/iff";
 
 const logger = LogManager.get("viewer/controllers/TextureController");
 
@@ -76,6 +85,50 @@ export class TextureController extends Controller {
 
                     this._textures.val = textures;
                 }
+            } else if (ext === "xvr") {
+                const rb = result_builder<XvrTexture>(logger);
+                const decomp = prs_decompress(cursor);
+                decomp.u32();
+                decomp.u32();
+                const xvr = parse_xvr(decomp);
+                this.set_result(rb.success(xvr));
+                this._textures.val = [xvr];
+            } else if (ext === "png") {
+                const rb = result_builder<XvrTexture>(logger);
+                const canvas = document.createElement("canvas");
+                const ctx = canvas.getContext("2d")!;
+                const img = new Image();
+                img.src = URL.createObjectURL(new Blob([buffer]));
+                img.onload = () => {
+                    const [w, h] = adjust_image_dimensions_for_xvr(img.width, img.height);
+                    canvas.width = w;
+                    canvas.height = h;
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    const xvr = rgba8_to_xvr_texture(data)!;
+                    this.set_result(rb.success(xvr));
+                    this._textures.val = [xvr];
+                    const xvr_bytes = write_xvr(xvr);
+                    xvr_bytes.seek_start(0);
+                    const iff = write_iff({type: 0x54525658, data: xvr_bytes});
+                    iff.seek_start(0);
+                    const prs = prs_compress(iff);
+                    let body = "";
+                    let i = 1;
+                    while (prs.bytes_left) {
+                        const hex = "0x" + prs.u8().toString(16).padStart(2, "0");
+                        body += hex;
+                        if (i !== 0 && i % 16 === 0) {
+                            body += "\n";
+                        } else {
+                            body += " ";
+                        }
+                        i++;
+                    }
+
+                    console.log(iff.size);
+                    console.log(".data\n" + "7777:\n" + body);
+                };
             } else {
                 logger.debug(`Unsupported file extension in filename "${file.name}".`);
                 this.set_result(

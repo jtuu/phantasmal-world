@@ -2,6 +2,9 @@ import { Cursor } from "../cursor/Cursor";
 import { Result, result_builder } from "../../Result";
 import { LogManager } from "../../Logger";
 import { Severity } from "../../Severity";
+import { WritableCursor } from "../cursor/WritableCursor";
+import { ArrayBufferCursor } from "../cursor/ArrayBufferCursor";
+import { Endianness } from "../Endianness";
 
 const logger = LogManager.get("core/data_formats/parsing/iff");
 
@@ -77,4 +80,15 @@ function parse<T>(
     } else {
         return result.success(chunks);
     }
+}
+
+export function write_iff(chunk: IffChunk, dst?: WritableCursor): Cursor {
+    const header_size = 8;
+    if (dst === undefined) {
+        dst = new ArrayBufferCursor(new ArrayBuffer(chunk.data.size + header_size), Endianness.Little);
+    }
+    dst.write_u32(chunk.type);
+    dst.write_u32(chunk.data.size);
+    dst.write_cursor(chunk.data);
+    return dst;
 }

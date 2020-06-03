@@ -13,7 +13,7 @@ export class TextureView extends ResizableView {
     private readonly open_file_button = new FileButton({
         icon_left: Icon.File,
         text: "Open file...",
-        accept: ".afs, .xvm",
+        accept: ".afs, .xvm, .xvr, .png",
     });
 
     private readonly tool_bar = this.add(new ToolBar(this.open_file_button));
